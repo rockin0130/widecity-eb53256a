@@ -1,0 +1,4 @@
+const fs = require('fs');
+const content = "import { CapacitorCalendar } from '@ebarooni/capacitor-calendar';\n\nexport async function requestCalendarPermission() {\n  const result = await CapacitorCalendar.requestFullCalendarAccess();\n  return result;\n}\n\nexport async function getCalendarEvents(startDate: Date, endDate: Date) {\n  const events = await CapacitorCalendar.listEventsInRange({\n    from: startDate.getTime(),\n    to: endDate.getTime(),\n  });\n  return events.result;\n}\n\nexport async function addCalendarEvent(title: string, startDate: Date, endDate: Date) {\n  const result = await CapacitorCalendar.createEventWithPrompt({\n    title,\n    startDate: startDate.getTime(),\n    endDate: endDate.getTime(),\n  });\n  return result;\n}";
+fs.writeFileSync('src/integrations/appleCalendar.ts', content);
+console.log('Done!');

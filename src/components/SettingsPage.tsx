@@ -1,8 +1,30 @@
 import { useState, useEffect } from "react";
-import { User, Bell, Shield, Palette, HelpCircle, LogOut, ChevronRight, Link2, Copy, Check, Unlink, Loader2, Calendar, ExternalLink, Users } from "lucide-react";
+import { requestCalendarPermission } from "../integrations/appleCalendar";
+import {
+  User,
+  Bell,
+  Shield,
+  Palette,
+  HelpCircle,
+  LogOut,
+  ChevronRight,
+  Link2,
+  Copy,
+  Check,
+  Unlink,
+  Loader2,
+  Calendar,
+  ExternalLink,
+  Users,
+} from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import GroupManager from "@/components/GroupManager";
 
@@ -14,13 +36,26 @@ const settingsItems = [
 ];
 
 const SettingsPage = () => {
-  const { user, session, profile, partner, groups, activeGroup, setActiveGroup, signOut, connectPartner, disconnectPartner } = useAuth();
+  const {
+    user,
+    session,
+    profile,
+    partner,
+    groups,
+    activeGroup,
+    setActiveGroup,
+    signOut,
+    connectPartner,
+    disconnectPartner,
+  } = useAuth();
   const [showPartnerDialog, setShowPartnerDialog] = useState(false);
   const [inviteInput, setInviteInput] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [gcalConnected, setGcalConnected] = useState<boolean | null>(null);
   const [gcalLoading, setGcalLoading] = useState(false);
+  const [appleCalConnected, setAppleCalConnected] = useState(false);
+  const [appleCalLoading, setAppleCalLoading] = useState(false);
 
   // Settings should always be scoped to a specific group
   useEffect(() => {
@@ -88,13 +123,43 @@ const SettingsPage = () => {
     }
   };
 
+  const handleConnectAppleCalendar = async () => {
+    setAppleCalLoading(true);
+    try {
+      
+      const result = await requestCalendarPermission();
+      if (result.result === 'granted') {
+        setAppleCalConnected(true);
+        toast.success("Apple Calendar connected!");
+        return;
+      }
+      if (result.readCalendar === 'granted' || result.writeCalendar === 'granted') {
+        setAppleCalConnected(true);
+        toast.success('Apple Calendar connected!');
+      } else {
+        toast.error('Calendar permission denied');
+      }
+    } catch (err) {
+      toast.error('Failed to connect Apple Calendar');
+    }
+    setAppleCalLoading(false);
+  };
+
+  const handleDisconnectAppleCalendar = () => {
+    setAppleCalConnected(false);
+    toast.success('Apple Calendar disconnected');
+  };
+
   const handleConnectGoogleCalendar = async () => {
     if (!user || !activeGroup) return;
     setGcalLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("google-calendar-auth-url", {
-        body: { group_id: activeGroup.id },
-      });
+      const { data, error } = await supabase.functions.invoke(
+        "google-calendar-auth-url",
+        {
+          body: { group_id: activeGroup.id },
+        },
+      );
       if (error || !data?.url) throw error || new Error("No URL returned");
       window.location.href = data.url;
     } catch (err) {
@@ -107,10 +172,13 @@ const SettingsPage = () => {
     if (!activeGroup) return;
     setGcalLoading(true);
     try {
-      const { error } = await supabase.functions.invoke("google-calendar-disconnect", {
-        headers: { Authorization: `Bearer ${session?.access_token}` },
-        body: { group_id: activeGroup.id },
-      });
+      const { error } = await supabase.functions.invoke(
+        "google-calendar-disconnect",
+        {
+          headers: { Authorization: `Bearer ${session?.access_token}` },
+          body: { group_id: activeGroup.id },
+        },
+      );
       if (error) throw error;
       setGcalConnected(false);
       toast.success("Google Calendar disconnected");
@@ -129,15 +197,18 @@ const SettingsPage = () => {
         <h1 className="text-[1.75rem] font-bold tracking-display">Settings</h1>
       </header>
 
-
       {/* Profile Card */}
       <div className="bg-card rounded-xl p-5 border border-border shadow-card mb-4 flex items-center gap-4">
         <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xl font-bold">
           {initial}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-base truncate">{profile?.display_name || "You"}</p>
-          <p className="text-sm text-muted-foreground truncate">{profile?.email}</p>
+          <p className="font-semibold text-base truncate">
+            {profile?.display_name || "You"}
+          </p>
+          <p className="text-sm text-muted-foreground truncate">
+            {profile?.email}
+          </p>
         </div>
         {partner && (
           <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-accent-foreground text-sm font-bold">
@@ -162,15 +233,24 @@ const SettingsPage = () => {
             <div className="flex items-center gap-3">
               <span className="text-2xl">{activeGroup.emoji}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">{activeGroup.name}</p>
-                <p className="text-xs text-muted-foreground">{activeGroup.members.length} member{activeGroup.members.length !== 1 ? "s" : ""}</p>
+                <p className="text-sm font-semibold truncate">
+                  {activeGroup.name}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {activeGroup.members.length} member
+                  {activeGroup.members.length !== 1 ? "s" : ""}
+                </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
               <div className="flex-1 bg-secondary rounded-lg px-3 py-2.5 text-center">
-                <span className="text-xs text-muted-foreground block">Group Invite Code</span>
-                <span className="text-lg font-bold tracking-widest">{activeGroup.invite_code || "..."}</span>
+                <span className="text-xs text-muted-foreground block">
+                  Group Invite Code
+                </span>
+                <span className="text-lg font-bold tracking-widest">
+                  {activeGroup.invite_code || "..."}
+                </span>
               </div>
               <button
                 onClick={() => {
@@ -185,16 +265,25 @@ const SettingsPage = () => {
             </div>
 
             <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Members</p>
+              <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+                Members
+              </p>
               <div className="space-y-2">
                 {activeGroup.members.map((member) => (
-                  <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg bg-secondary/40">
+                  <div
+                    key={member.id}
+                    className="flex items-center gap-3 p-2 rounded-lg bg-secondary/40"
+                  >
                     <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
                       {member.display_name?.charAt(0)?.toUpperCase() || "?"}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{member.display_name || "Member"}</p>
-                      <p className="text-xs text-muted-foreground truncate">{member.email || ""}</p>
+                      <p className="text-sm font-medium truncate">
+                        {member.display_name || "Member"}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {member.email || ""}
+                      </p>
                     </div>
                     <span className="text-[10px] font-medium text-muted-foreground uppercase bg-card px-2 py-0.5 rounded">
                       {member.role}
@@ -206,12 +295,58 @@ const SettingsPage = () => {
           </div>
         ) : (
           <div className="p-4">
-            <p className="text-sm text-muted-foreground">Select a group above to view its settings.</p>
+            <p className="text-sm text-muted-foreground">
+              Select a group above to view its settings.
+            </p>
           </div>
         )}
       </div>
 
-      {/* Google Calendar Integration (group-specific) */}
+      {/* Apple Calendar Integration */}
+      <div className="bg-card rounded-xl border border-border shadow-card mb-6 overflow-hidden">
+        <div className="p-4">
+          <div className="flex items-center gap-3 mb-3">
+            <Calendar size={16} className="text-primary" />
+            <span className="text-sm font-semibold">Apple Calendar Sync</span>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Connect your Apple Calendar to sync events with this group.
+          </p>
+          {appleCalConnected ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20">
+                <span className="text-xl">🍎</span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-primary">Connected</p>
+                  <p className="text-xs text-muted-foreground">Apple Calendar is syncing</p>
+                </div>
+                <Check size={16} className="text-primary" />
+              </div>
+              <button
+                onClick={handleDisconnectAppleCalendar}
+                className="w-full py-2.5 rounded-xl border border-destructive/30 text-destructive text-sm font-semibold hover:bg-destructive/10 transition-colors flex items-center justify-center gap-2"
+              >
+                <Unlink size={16} />
+                Disconnect Apple Calendar
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleConnectAppleCalendar}
+              disabled={appleCalLoading}
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              <span className="text-xl">🍎</span>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-semibold">Connect Apple Calendar</p>
+                <p className="text-xs opacity-80">Sync your iPhone calendar with this group</p>
+              </div>
+              {appleCalLoading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+            </button>
+          )}
+        </div>
+      </div>
+            {/* Google Calendar Integration (group-specific) */}
       <div className="bg-card rounded-xl border border-border shadow-card mb-6 overflow-hidden">
         <div className="p-4">
           <div className="flex items-center gap-3 mb-3">
@@ -230,7 +365,10 @@ const SettingsPage = () => {
             </div>
           ) : gcalConnected === null ? (
             <div className="flex items-center justify-center py-3">
-              <Loader2 size={16} className="animate-spin text-muted-foreground" />
+              <Loader2
+                size={16}
+                className="animate-spin text-muted-foreground"
+              />
             </div>
           ) : gcalConnected ? (
             <div className="space-y-3">
@@ -238,7 +376,9 @@ const SettingsPage = () => {
                 <span className="text-xl">📅</span>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-primary">Connected</p>
-                  <p className="text-xs text-muted-foreground">Syncing for this group only</p>
+                  <p className="text-xs text-muted-foreground">
+                    Syncing for this group only
+                  </p>
                 </div>
                 <Check size={16} className="text-primary" />
               </div>
@@ -247,7 +387,11 @@ const SettingsPage = () => {
                 disabled={gcalLoading}
                 className="w-full py-2.5 rounded-xl border border-destructive/30 text-destructive text-sm font-semibold hover:bg-destructive/10 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                {gcalLoading ? <Loader2 size={16} className="animate-spin" /> : <Unlink size={16} />}
+                {gcalLoading ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Unlink size={16} />
+                )}
                 Disconnect Google Calendar
               </button>
             </div>
@@ -260,9 +404,15 @@ const SettingsPage = () => {
               <span className="text-xl">📅</span>
               <div className="flex-1 text-left">
                 <p className="text-sm font-semibold">Connect Google Calendar</p>
-                <p className="text-xs opacity-80">Enable sync for this selected group</p>
+                <p className="text-xs opacity-80">
+                  Enable sync for this selected group
+                </p>
               </div>
-              {gcalLoading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+              {gcalLoading ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <ExternalLink size={14} />
+              )}
             </button>
           )}
         </div>
@@ -319,7 +469,11 @@ const SettingsPage = () => {
               disabled={connecting || inviteInput.length < 4}
               className="w-full py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {connecting ? <Loader2 size={16} className="animate-spin" /> : <Link2 size={16} />}
+              {connecting ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Link2 size={16} />
+              )}
               {connecting ? "Connecting..." : "Connect"}
             </button>
           </div>
