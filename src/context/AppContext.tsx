@@ -269,39 +269,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [partnerTasks, setPartnerTasks] = useState<Task[]>([]);
   const [partnerWorkouts, setPartnerWorkouts] = useState<Workout[]>([]);
   const [googleCalendarEvents, setGoogleCalendarEvents] = useState<GoogleCalendarEvent[]>([]);
-  const [appleCalendarEvents, setAppleCalendarEvents] = useState<AppleCalendarEvent[]>([]);
+  const [appleCalendarEvents, setAppleCalendarEvents] = useState<AppleCalendarEvent[]>(() => {
+    try {
+      const saved = localStorage.getItem('appleCalendarEvents');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
 
-  // Merge Apple Calendar events into Google Calendar format when they change
+  // Save to localStorage whenever apple events change
   useEffect(() => {
-    if (appleCalendarEvents.length === 0) return;
-    const converted = appleCalendarEvents.map((ae) => ({
-  ...ae,
-  isApple: true,
-  source: "apple",
-      id: ae.id,
-      // Add fallback calendar metadata for proper UI grouping
-      calendarTitle: ae.calendarTitle || ae.calendarId || "Apple",
-      calendarId: ae.calendarId || "apple-default",
-      title: ae.title,
-      description: null,
-      start: new Date(ae.startDate).toISOString(),
-      end: new Date(ae.endDate).toISOString(),
-      allDay: ae.allDay,
-      location: ae.location || null,
-      htmlLink: "",
-      calendarColor: ae.calendarColor || "#888888",
-      assignee: "me" as const,
-      done: false,
-      completedAt: null,
-      completedBy: null,
-    }));
-    setGoogleCalendarEvents((prev) => {
-      const withoutApple = prev.filter((e) => !e.id.startsWith("apple-"));
-      const appleConverted = converted.map((e) => ({ ...e, id: "apple-" + e.id }));
-      console.log("Apple events:", appleConverted.slice(0,2).map(e => e.id));
-      return [...withoutApple, ...appleConverted];
-    });
+    try {
+      localStorage.setItem('appleCalendarEvents', JSON.stringify(appleCalendarEvents));
+    } catch {}
   }, [appleCalendarEvents]);
+
+
   const [habitSectionsState, setHabitSectionsState] = useState<HabitSectionMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshCounter, setRefreshCounter] = useState(0);
@@ -532,7 +514,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   // Load Google Calendar events — supports both single group and "All" mode
   useEffect(() => {
     if (!user) {
-      setGoogleCalendarEvents([]);
+      setGoogleCalendarEvents((prev) => prev.filter((e) => e.id.startsWith("apple-")));
       return;
     }
 
@@ -626,7 +608,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         });
 
         if (cancelled) return;
-        setGoogleCalendarEvents(enriched);
+        setGoogleCalendarEvents((prev) => {
+          const appleEvents = prev.filter((e) => e.id.startsWith("apple-"));
+          return [...enriched, ...appleEvents];
+        });
       } catch (err) {
         console.error("Error loading Google Calendar events:", err);
       }
@@ -1697,7 +1682,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       googleCalendarEvents, hideGcalEvent, toggleGcalCompletion, toggleEventVisibility, designateGcalEvent,
       appleCalendarEvents, setAppleCalendarEvents,
       mergeAppleEvents: (events: AppleCalendarEvent[]) => {
-        setAppleCalendarEvents(events);
         const converted = events.map((ae) => ({
           isApple: true,
           id: "apple-" + ae.id,

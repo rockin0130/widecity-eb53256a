@@ -3,7 +3,7 @@ import { Clock, Flame, Check, Trash2, ChevronDown, ChevronUp, Loader2, X, Dumbbe
 import WorkoutStatsCards from "@/components/WorkoutStatsCards";
 import WorkoutAiSuggest from "@/components/WorkoutAiSuggest";
 import GroupBadge from "@/components/GroupBadge";
-import { useAppContext, Workout, isCardioWorkout } from "@/context/AppContext";
+import { useAppContext, Workout } from "@/context/AppContext";
 import ItemActionMenu from "@/components/ItemActionMenu";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +18,22 @@ import GroupSelector from "@/components/GroupSelector";
 import { useGroupContext } from "@/hooks/useGroupContext";
 import ExerciseLogModal from "@/components/ExerciseLogModal";
 import WorkoutPhotoPrompt from "@/components/WorkoutPhotoPrompt";
+
+const isCardioWorkout = (workout: Workout) => {
+  const value = `${(workout as any)?.name ?? ""} ${(workout as any)?.title ?? ""} ${(workout as any)?.type ?? ""}`.toLowerCase();
+  return (
+    value.includes("cardio") ||
+    value.includes("run") ||
+    value.includes("running") ||
+    value.includes("walk") ||
+    value.includes("walking") ||
+    value.includes("bike") ||
+    value.includes("cycling") ||
+    value.includes("swim") ||
+    value.includes("rowing") ||
+    value.includes("hiit")
+  );
+};
 
 interface AIPlan {
   title: string;

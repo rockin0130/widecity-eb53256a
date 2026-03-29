@@ -1,0 +1,328 @@
+===== SettingsPage apple-related =====
+2:import { requestCalendarPermission, getCalendarEvents } from "../integrations/appleCalendar";
+49:    connectPartner,
+50:    disconnectPartner,
+52:  const { setAppleCalendarEvents, mergeAppleEvents } = useAppContext();
+55:  const [connecting, setConnecting] = useState(false);
+57:  const [gcalConnected, setGcalConnected] = useState<boolean | null>(null);
+59:  const [appleCalConnected, setAppleCalConnected] = useState(false);
+60:  const [appleCalLoading, setAppleCalLoading] = useState(false);
+69:  // Check if Google Calendar is connected for active group
+72:      setGcalConnected(false);
+76:    const checkGcal = async () => {
+83:      setGcalConnected(!!data);
+87:    // Check URL for gcal=connected redirect
+89:    if (params.get("gcal") === "connected") {
+90:      setGcalConnected(true);
+91:      toast.success("Google Calendar connected! 🎉");
+105:  const handleConnect = async () => {
+107:    setConnecting(true);
+108:    const result = await connectPartner(inviteInput.trim());
+110:      toast.success(`Connected with ${result.partner_name}! 🎉`);
+114:      toast.error(result.error || "Failed to connect");
+116:    setConnecting(false);
+119:  const handleDisconnect = async () => {
+120:    const result = await disconnectPartner();
+122:      toast.success("Partner disconnected");
+124:      toast.error(result.error || "Failed to disconnect");
+128:  const handleConnectAppleCalendar = async () => {
+129:    setAppleCalLoading(true);
+134:        setAppleCalConnected(true);
+135:        toast.success("Apple Calendar connected!");
+136:        // Fetch events for the next year
+142:            mergeAppleEvents(events);
+150:    setAppleCalLoading(false);
+153:  const handleDisconnectAppleCalendar = () => {
+154:    setAppleCalConnected(false);
+155:    toast.success('Apple Calendar disconnected');
+158:  const handleConnectGoogleCalendar = async () => {
+171:      toast.error("Failed to start Google Calendar connection");
+176:  const handleDisconnectGoogleCalendar = async () => {
+181:        "google-calendar-disconnect",
+188:      setGcalConnected(false);
+189:      toast.success("Google Calendar disconnected");
+191:      toast.error("Failed to disconnect Google Calendar");
+310:      {/* Apple Calendar Integration */}
+315:            <span className="text-sm font-semibold">Apple Calendar Sync</span>
+318:            Connect your Apple Calendar to sync events with this group.
+320:          {appleCalConnected ? (
+325:                  <p className="text-sm font-medium text-primary">Connected</p>
+326:                  <p className="text-xs text-muted-foreground">Apple Calendar is syncing</p>
+331:                onClick={handleDisconnectAppleCalendar}
+335:                Disconnect Apple Calendar
+340:              onClick={handleConnectAppleCalendar}
+341:              disabled={appleCalLoading}
+346:                <p className="text-sm font-semibold">Connect Apple Calendar</p>
+347:                <p className="text-xs opacity-80">Sync your iPhone calendar with this group</p>
+349:              {appleCalLoading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+359:            <span className="text-sm font-semibold">Google Calendar Sync</span>
+363:              ? `Connect Google Calendar for ${activeGroup.name} only.`
+364:              : "Select a group in My Groups & Calendars to manage Google Calendar sync."}
+371:          ) : gcalConnected === null ? (
+378:          ) : gcalConnected ? (
+383:                  <p className="text-sm font-medium text-primary">Connected</p>
+385:                    Syncing for this group only
+391:                onClick={handleDisconnectGoogleCalendar}
+400:                Disconnect Google Calendar
+405:              onClick={handleConnectGoogleCalendar}
+411:                <p className="text-sm font-semibold">Connect Google Calendar</p>
+413:                  Enable sync for this selected group
+459:            <DialogTitle>Connect with Partner</DialogTitle>
+473:              onClick={handleConnect}
+474:              disabled={connecting || inviteInput.length < 4}
+477:              {connecting ? (
+482:              {connecting ? "Connecting..." : "Connect"}
+
+===== AppContext apple-related =====
+24:export interface ScheduledEvent {
+45:  calendarId?: string | null;
+86:export interface GoogleCalendarEvent {
+100:  calendarId?: string;
+101:  calendarColor?: string | null;
+102:  isApple?: boolean;
+105:export interface AppleCalendarEvent {
+112:  calendarId?: string;
+113:  calendarTitle?: string;
+114:  calendarColor?: string | null;
+132:  events: ScheduledEvent[];
+133:  filteredEvents: ScheduledEvent[];
+134:  addEvent: (event: Omit<ScheduledEvent, "id">) => void;
+135:  removeEvent: (id: string) => void;
+136:  updateEvent: (id: string, updates: Partial<Pick<ScheduledEvent, "title" | "time" | "endTime" | "day" | "month" | "year" | "endDay" | "endMonth" | "endYear" | "allDay" | "description">>) => Promise<void>;
+137:  rescheduleEvent: (id: string, day: number, month: number, year: number) => Promise<void>;
+138:  toggleEventCompletion: (id: string) => Promise<void>;
+165:  googleCalendarEvents: GoogleCalendarEvent[];
+166:  appleCalendarEvents: AppleCalendarEvent[];
+167:  setAppleCalendarEvents: (events: AppleCalendarEvent[]) => void;
+168:  mergeAppleEvents: (events: AppleCalendarEvent[]) => void;
+169:  hideGcalEvent: (eventId: string) => Promise<void>;
+170:  toggleGcalCompletion: (eventId: string) => Promise<void>;
+171:  toggleEventVisibility: (eventId: string) => Promise<void>;
+172:  designateGcalEvent: (eventId: string, assignee: "me" | "partner" | "both") => Promise<void>;
+175:  partnerEvents: ScheduledEvent[];
+180:  filteredPartnerEvents: ScheduledEvent[];
+217:  const [events, setEvents] = useState<ScheduledEvent[]>([]);
+225:  const [partnerEvents, setPartnerEvents] = useState<ScheduledEvent[]>([]);
+228:  const [googleCalendarEvents, setGoogleCalendarEvents] = useState<GoogleCalendarEvent[]>([]);
+229:  const [appleCalendarEvents, setAppleCalendarEvents] = useState<AppleCalendarEvent[]>([]);
+231:  // Merge Apple Calendar events into Google Calendar format when they change
+233:    if (appleCalendarEvents.length === 0) return;
+234:    const converted = appleCalendarEvents.map((ae) => ({
+236:  isApple: true,
+237:  source: "apple",
+239:      // Add fallback calendar metadata for proper UI grouping
+240:      calendarTitle: ae.calendarTitle || ae.calendarId || "Apple",
+241:      calendarId: ae.calendarId || "apple-default",
+249:      calendarColor: ae.calendarColor || "#888888",
+255:    setGoogleCalendarEvents((prev) => {
+256:      const withoutApple = prev.filter((e) => !e.id.startsWith("apple-"));
+257:      const appleConverted = converted.map((e) => ({ ...e, id: "apple-" + e.id }));
+258:      console.log("Apple events:", appleConverted.slice(0,2).map(e => e.id));
+259:      return [...withoutApple, ...appleConverted];
+261:  }, [appleCalendarEvents]);
+285:      setEvents([]);
+289:      setPartnerEvents([]);
+362:        // Load events
+363:        const { data: eventsData } = await supabase
+364:          .from("events")
+368:        if (eventsData) {
+369:          setEvents(eventsData.map((e: any) => ({
+389:            calendarId: e.calendar_id || null,
+504:  // Load Google Calendar events — supports both single group and "All" mode
+507:      setGoogleCalendarEvents([]);
+524:        console.warn("Unable to refresh auth session before Google Calendar sync:", refreshError.message);
+530:    const loadGcalEvents = async () => {
+541:            ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-sync?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&groupId=${encodeURIComponent(activeGroup.id)}&groupShared=true`
+542:            : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-sync?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&allGroups=true`;
+566:          console.warn("Google Calendar sync failed", {
+574:        const rawEvents: GoogleCalendarEvent[] = data.events || [];
+577:        // Load completion states for these gcal events
+578:        const gcalIds = rawEvents.map((ge) => ge.id);
+580:          ? await supabase.from("gcal_event_completions").select("*").in("gcal_event_id", gcalIds)
+582:        const completionMap = new Map((completions || []).map((c: any) => [c.gcal_event_id, c]));
+584:        const enriched = rawEvents.map((ge) => {
+590:            isApple: false,
+601:        setGoogleCalendarEvents(enriched);
+603:        console.error("Error loading Google Calendar events:", err);
+607:    void loadGcalEvents();
+618:      setPartnerEvents([]);
+629:        const allEvents: ScheduledEvent[] = [];
+697:          // Other user's events
+698:          const { data: pEvents } = await supabase
+699:            .from("events")
+703:          if (pEvents) {
+704:            allEvents.push(...pEvents.map((e: any) => ({
+771:        setPartnerEvents(allEvents);
+790:  // ── Realtime subscription for tasks/events/workouts (cross-user sync) ──
+815:    const applyEventUpdate = (row: any) => ({
+856:        { event: "*", schema: "public", table: "tasks" },
+858:          if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+878:          } else if (payload.eventType === "DELETE") {
+889:        { event: "*", schema: "public", table: "events" },
+891:          if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+896:              const ownEvent = applyEventUpdate(row);
+897:              setEvents((prev) => upsertById(prev, ownEvent));
+898:              setPartnerEvents((prev) => prev.filter((e) => e.id !== row.id));
+903:              const partnerEvent = {
+904:                ...applyEventUpdate(row),
+908:              setPartnerEvents((prev) => upsertById(prev, partnerEvent));
+909:              setEvents((prev) => prev.filter((e) => e.id !== row.id));
+911:          } else if (payload.eventType === "DELETE") {
+914:              setEvents((prev) => prev.filter((e) => e.id !== deletedId));
+915:              setPartnerEvents((prev) => prev.filter((e) => e.id !== deletedId));
+922:        { event: "*", schema: "public", table: "workouts" },
+924:          if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+943:          } else if (payload.eventType === "DELETE") {
+1059:  const addEvent = async (event: Omit<ScheduledEvent, "id">) => {
+1062:    const normalizedTitle = event.title.trim().toLowerCase();
+1063:    const normalizedTime = (event.time || "All day").trim().toLowerCase();
+1064:    const duplicateInMemory = events.some((existing) =>
+1067:      existing.day === event.day &&
+1068:      existing.month === event.month &&
+1069:      existing.year === event.year &&
+1070:      existing.user === event.user
+1076:      .from("events")
+1079:      .eq("title", event.title)
+1080:      .eq("time", event.time || "All day")
+1081:      .eq("day", event.day)
+1082:      .eq("month", event.month)
+1083:      .eq("year", event.year)
+1084:      .eq("assignee", event.user)
+1090:    const isAllDay = event.allDay ?? (!event.time || event.time === "All day");
+1092:      .from("events")
+1095:        title: event.title,
+1096:        time: isAllDay ? "All day" : (event.time || "All day"),
+1097:        description: event.description,
+1098:        day: event.day,
+1099:        month: event.month,
+1100:        year: event.year,
+1101:        end_day: event.endDay ?? event.day,
+1102:        end_month: event.endMonth ?? event.month,
+1103:        end_year: event.endYear ?? event.year,
+1104:        end_time: event.endTime ?? (isAllDay ? "" : (event.time || "")),
+1106:        assignee: event.user,
+1111:        calendar_id: event.calendarId || null,
+1117:      setEvents((e) => [...e, {
+1118:        ...event,
+1119:        time: isAllDay ? "All day" : (event.time || "All day"),
+1126:        endDay: event.endDay ?? event.day,
+1127:        endMonth: event.endMonth ?? event.month,
+1128:        endYear: event.endYear ?? event.year,
+1129:        endTime: event.endTime ?? (isAllDay ? "" : (event.time || "")),
+1131:        calendarId: (data as any).calendar_id || event.calendarId || null,
+1136:  const removeEvent = async (id: string) => {
+1137:    setEvents((e) => e.filter((item) => item.id !== id));
+1138:    await supabase.from("events").delete().eq("id", id);
+1141:  const updateEvent = async (id: string, updates: Partial<Pick<ScheduledEvent, "title" | "time" | "endTime" | "day" | "month" | "year" | "endDay" | "endMonth" | "endYear" | "allDay" | "description">>) => {
+1142:    setEvents((e) => e.map((item) => item.id === id ? { ...item, ...updates } : item));
+1155:    await supabase.from("events").update(dbUpdates).eq("id", id);
+1158:  const rescheduleEvent = async (id: string, day: number, month: number, year: number) => {
+1159:    setEvents((e) =>
+1162:    await supabase.from("events").update({ day, month, year }).eq("id", id);
+1170:  const applyEventCompletionState = (eventId: string, done: boolean, completedAt: string | null, completedBy: string | null) => {
+1171:    setEvents((prev) => prev.map((item) => item.id === eventId ? { ...item, done, completedAt, completedBy } : item));
+1172:    setPartnerEvents((prev) => prev.map((item) => item.id === eventId ? { ...item, done, completedAt, completedBy } : item));
+1201:  const toggleEventCompletion = async (id: string) => {
+1203:    const event = events.find((e) => e.id === id) || partnerEvents.find((e) => e.id === id);
+1204:    if (!event) return;
+1206:    const newDone = !event.done;
+1209:    applyEventCompletionState(id, newDone, optimisticCompletedAt, optimisticCompletedBy);
+1211:    const { data, error } = await supabase.rpc("toggle_event_completion", {
+1212:      _event_id: id,
+1217:      console.error("Failed to persist event toggle:", error);
+1218:      applyEventCompletionState(id, event.done ?? false, event.completedAt ?? null, event.completedBy ?? null);
+1223:      applyEventCompletionState(id, data.done ?? false, data.completed_at ?? null, data.completed_by ?? null);
+1590:  const filteredEvents = useMemo(() => filterByGroup(events), [events, filterByGroup]);
+1599:  const filteredPartnerEvents = useMemo(() => filterByGroup(partnerEvents), [partnerEvents, filterByGroup]);
+1606:  const hideGcalEvent = async (eventId: string) => {
+1609:    setGoogleCalendarEvents((prev) => prev.filter((e) => e.id !== eventId));
+1610:    await supabase.from("hidden_gcal_events").upsert({
+1612:      gcal_event_id: eventId,
+1614:    }, { onConflict: "user_id,gcal_event_id" });
+1617:  const toggleEventVisibility = async (eventId: string) => {
+1619:    const event = events.find((e) => e.id === eventId);
+1620:    if (!event) return;
+1621:    const newHidden = !event.hiddenFromPartner;
+1622:    setEvents((prev) =>
+1623:      prev.map((e) => e.id === eventId ? { ...e, hiddenFromPartner: newHidden } : e)
+1625:    await supabase.from("events").update({ hidden_from_partner: newHidden }).eq("id", eventId);
+1628:  const designateGcalEvent = async (eventId: string, assignee: "me" | "partner" | "both") => {
+1630:    setGoogleCalendarEvents((prev) =>
+1631:      prev.map((e) => e.id === eventId ? { ...e, assignee } : e)
+1633:    await supabase.from("gcal_event_designations").upsert({
+1635:      gcal_event_id: eventId,
+1637:    }, { onConflict: "user_id,gcal_event_id" });
+1640:  const toggleGcalCompletion = async (eventId: string) => {
+1642:    const ge = googleCalendarEvents.find((e) => e.id === eventId);
+1647:    setGoogleCalendarEvents((prev) =>
+1648:      prev.map((e) => e.id === eventId ? {
+1656:    const { error } = await supabase.from("gcal_event_completions" as any).upsert({
+1658:      gcal_event_id: eventId,
+1663:    }, { onConflict: "user_id,gcal_event_id" });
+1668:      setGoogleCalendarEvents((prev) =>
+1669:        prev.map((e) => e.id === eventId ? { ...e, done: ge.done, completedAt: ge.completedAt, completedBy: ge.completedBy } : e)
+1674:  console.log("[APPLE_CONTEXT_DEBUG] AppContext rendered");
+1679:      events, filteredEvents, addEvent, removeEvent, updateEvent, rescheduleEvent, toggleEventCompletion,
+1685:      googleCalendarEvents, hideGcalEvent, toggleGcalCompletion, toggleEventVisibility, designateGcalEvent,
+1686:      appleCalendarEvents, setAppleCalendarEvents,
+1687:      mergeAppleEvents: (events: AppleCalendarEvent[]) => {
+1688:        setAppleCalendarEvents(events);
+1689:        const converted = events.map((ae) => ({
+1690:          isApple: true,
+1691:          id: "apple-" + ae.id,
+1692:          // Add fallback calendar metadata for proper UI grouping
+1693:          calendarTitle: ae.calendarTitle || ae.calendarId || "Apple",
+1694:          calendarId: ae.calendarId || "apple-default",
+1702:          calendarColor: ae.calendarColor || "#888888",
+1708:        setGoogleCalendarEvents((prev) => {
+1709:          const withoutApple = prev.filter((e) => !e.id.startsWith("apple-"));
+1710:          return [...withoutApple, ...converted];
+1713:      partnerHabits, partnerEvents, partnerTasks, partnerWorkouts,
+1714:      filteredPartnerHabits, filteredPartnerEvents, filteredPartnerTasks, filteredPartnerWorkouts,
+
+===== appleCalendar integration =====
+1:import { CapacitorCalendar } from '@ebarooni/capacitor-calendar';
+3:export async function requestCalendarPermission() {
+4:  const result = await CapacitorCalendar.requestFullCalendarAccess();
+8:export async function getCalendarEvents(startDate: Date, endDate: Date) {
+9:  const events = await CapacitorCalendar.listEventsInRange({
+10:    from: startDate.getTime(),
+11:    to: endDate.getTime(),
+13:  console.log("[APPLE_DEBUG] returning apple events:", Array.isArray(events) ? events.length : events);
+14:  return events.result;
+17:export async function addCalendarEvent(title: string, startDate: Date, endDate: Date) {
+18:  const result = await CapacitorCalendar.createEventWithPrompt({
+20:    startDate: startDate.getTime(),
+21:    endDate: endDate.getTime(),
+
+===== search across src =====
+src/context/AppContext.tsx:102:  isApple?: boolean;
+src/context/AppContext.tsx:105:export interface AppleCalendarEvent {
+src/context/AppContext.tsx:166:  appleCalendarEvents: AppleCalendarEvent[];
+src/context/AppContext.tsx:167:  setAppleCalendarEvents: (events: AppleCalendarEvent[]) => void;
+src/context/AppContext.tsx:168:  mergeAppleEvents: (events: AppleCalendarEvent[]) => void;
+src/context/AppContext.tsx:229:  const [appleCalendarEvents, setAppleCalendarEvents] = useState<AppleCalendarEvent[]>([]);
+src/context/AppContext.tsx:233:    if (appleCalendarEvents.length === 0) return;
+src/context/AppContext.tsx:234:    const converted = appleCalendarEvents.map((ae) => ({
+src/context/AppContext.tsx:236:  isApple: true,
+src/context/AppContext.tsx:261:  }, [appleCalendarEvents]);
+src/context/AppContext.tsx:590:            isApple: false,
+src/context/AppContext.tsx:1686:      appleCalendarEvents, setAppleCalendarEvents,
+src/context/AppContext.tsx:1687:      mergeAppleEvents: (events: AppleCalendarEvent[]) => {
+src/context/AppContext.tsx:1688:        setAppleCalendarEvents(events);
+src/context/AppContext.tsx:1690:          isApple: true,
+src/components/CalendarPage.tsx:1320:                {item.type === "gcal" && ((item.raw as any)?.isApple ? <AppleBadge /> : <GoogleBadge />)}
+src/components/CalendarPage.tsx:1352:            {item.type === "gcal" && ((item.raw as any)?.isApple ? <AppleBadge /> : <GoogleBadge />)}
+src/components/SettingsPage.tsx:2:import { requestCalendarPermission, getCalendarEvents } from "../integrations/appleCalendar";
+src/components/SettingsPage.tsx:52:  const { setAppleCalendarEvents, mergeAppleEvents } = useAppContext();
+src/components/SettingsPage.tsx:59:  const [appleCalConnected, setAppleCalConnected] = useState(false);
+src/components/SettingsPage.tsx:60:  const [appleCalLoading, setAppleCalLoading] = useState(false);
+src/components/SettingsPage.tsx:128:  const handleConnectAppleCalendar = async () => {
+src/components/SettingsPage.tsx:129:    setAppleCalLoading(true);
+src/components/SettingsPage.tsx:134:        setAppleCalConnected(true);
+src/components/SettingsPage.tsx:142:            mergeAppleEvents(events);
+src/components/SettingsPage.tsx:150:    setAppleCalLoading(false);
+src/components/SettingsPage.tsx:153:  const handleDisconnectAppleCalendar = () => {
+src/components/SettingsPage.tsx:154:    setAppleCalConnected(false);
+src/components/SettingsPage.tsx:331:                onClick={handleDisconnectAppleCalendar}
+src/components/SettingsPage.tsx:340:              onClick={handleConnectAppleCalendar}

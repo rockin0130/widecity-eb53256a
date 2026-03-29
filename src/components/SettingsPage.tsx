@@ -29,7 +29,6 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import GroupManager from "@/components/GroupManager";
 
-
 const settingsItems = [
   { icon: Bell, label: "Notifications", desc: "Reminders & alerts" },
   { icon: Shield, label: "Privacy", desc: "Data & sharing" },
@@ -51,6 +50,32 @@ const SettingsPage = () => {
     disconnectPartner,
   } = useAuth();
   const { setAppleCalendarEvents, mergeAppleEvents } = useAppContext();
+
+  // Auto-load Apple Calendar events on mount if permission already granted
+  useEffect(() => {
+    const autoLoadAppleCalendar = async () => {
+      try {
+        const result = await requestCalendarPermission();
+        if (result.result === 'granted') {
+          setAppleCalConnected(true);
+          const now = new Date();
+          const nextYear = new Date();
+          nextYear.setFullYear(nextYear.getFullYear() + 1);
+          const events = await getCalendarEvents(now, nextYear);
+          if (events && events.length > 0) {
+            toast("Merging " + events.length + " events");
+            mergeAppleEvents(events);
+            setTimeout(() => toast("After 2s: check calendar"), 2000);
+          } else {
+            toast("No events found: " + JSON.stringify(events?.length));
+          }
+        }
+      } catch (err) {
+        // Permission not granted yet, ignore
+      }
+    };
+    autoLoadAppleCalendar();
+  }, []);
   const [showPartnerDialog, setShowPartnerDialog] = useState(false);
   const [inviteInput, setInviteInput] = useState("");
   const [connecting, setConnecting] = useState(false);
@@ -423,7 +448,6 @@ const SettingsPage = () => {
           )}
         </div>
       </div>
-
 
       {/* Settings List */}
       <div className="space-y-1">
