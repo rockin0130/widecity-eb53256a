@@ -1224,55 +1224,82 @@ export type Database = {
       }
       workouts: {
         Row: {
+          cadence_avg: number | null
           cal: number
           completed_date: string | null
+          completion_photo_url: string | null
           created_at: string
           distance: number
           distance_unit: string
           done: boolean
           duration: string
+          elevation_gain: number | null
           emoji: string
           exercises: Json | null
           group_id: string | null
+          heart_rate_avg: number | null
           hidden_from_partner: boolean
           id: string
+          pace_avg: string | null
+          route_data: Json | null
           scheduled_date: string | null
+          source_app: string | null
+          source_device: string | null
+          speed_avg: number | null
           tag: string
           title: string
           user_id: string
         }
         Insert: {
+          cadence_avg?: number | null
           cal?: number
           completed_date?: string | null
+          completion_photo_url?: string | null
           created_at?: string
           distance?: number
           distance_unit?: string
           done?: boolean
           duration?: string
+          elevation_gain?: number | null
           emoji?: string
           exercises?: Json | null
           group_id?: string | null
+          heart_rate_avg?: number | null
           hidden_from_partner?: boolean
           id?: string
+          pace_avg?: string | null
+          route_data?: Json | null
           scheduled_date?: string | null
+          source_app?: string | null
+          source_device?: string | null
+          speed_avg?: number | null
           tag?: string
           title: string
           user_id: string
         }
         Update: {
+          cadence_avg?: number | null
           cal?: number
           completed_date?: string | null
+          completion_photo_url?: string | null
           created_at?: string
           distance?: number
           distance_unit?: string
           done?: boolean
           duration?: string
+          elevation_gain?: number | null
           emoji?: string
           exercises?: Json | null
           group_id?: string | null
+          heart_rate_avg?: number | null
           hidden_from_partner?: boolean
           id?: string
+          pace_avg?: string | null
+          route_data?: Json | null
           scheduled_date?: string | null
+          source_app?: string | null
+          source_device?: string | null
+          speed_avg?: number | null
           tag?: string
           title?: string
           user_id?: string

@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useCallback, useEffect } from "react";
+import { motion, AnimatePresence, useMotionValue, PanInfo } from "framer-motion";
 import MorePage from "@/components/MorePage";
 import BottomNav, { type Tab, loadNavPages, saveNavPages, FIXED_NAV_PAGES, MAX_NAV_SLOTS } from "@/components/BottomNav";
 import HomePage from "@/components/HomePage";
@@ -16,11 +16,17 @@ import SettingsPage from "@/components/SettingsPage";
 import ShoppingListPage from "@/components/ShoppingListPage";
 import LauncherPage from "@/components/LauncherPage";
 import AuthPage from "@/components/AuthPage";
+import AppDrawer from "@/components/AppDrawer";
+import DrawerMenuButton from "@/components/DrawerMenuButton";
+import FloatingAiBar from "@/components/FloatingAiBar";
 import { AppProvider } from "@/context/AppContext";
 import { useAuth, Group } from "@/context/AuthContext";
+import { useNavStyle } from "@/hooks/useNavStyle";
 import { Loader2 } from "lucide-react";
 
 type FullTab = "launcher" | Tab;
+
+const SWIPE_THRESHOLD = 80;
 
 const Index = () => {
   const { user, loading, groups, activeGroup, setActiveGroup } = useAuth();
@@ -28,6 +34,22 @@ const Index = () => {
   const [navPages, setNavPages] = useState<Tab[]>(() => loadNavPages());
   const [chatGroup, setChatGroup] = useState<Group | null>(null);
   const [chatMode, setChatMode] = useState<"list" | "chat">("list");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const { navStyle, setNavStyle } = useNavStyle();
+
+  // Swipe tracking for Home → Launcher transition
+  const swipeX = useMotionValue(0);
+
+  const resetHomeSwipeState = useCallback(() => {
+    swipeX.stop();
+    swipeX.set(0);
+  }, [swipeX]);
+
+  useEffect(() => {
+    if (activeTab !== "home") {
+      resetHomeSwipeState();
+    }
+  }, [activeTab, resetHomeSwipeState]);
 
   if (loading) {
     return (
@@ -42,16 +64,21 @@ const Index = () => {
   }
 
   const handleEnterGroup = (groupId: string | null) => {
+    resetHomeSwipeState();
+
     if (groupId) {
       const group = groups.find((g) => g.id === groupId);
       if (group) setActiveGroup(group);
     } else {
       setActiveGroup(null);
     }
+
     setActiveTab("home");
+    requestAnimationFrame(resetHomeSwipeState);
   };
 
   const handleBackToLauncher = () => {
+    resetHomeSwipeState();
     setActiveTab("launcher");
   };
 
@@ -105,9 +132,31 @@ const Index = () => {
     return <ChatListPage onOpenChat={handleOpenChat} />;
   };
 
+  const handleDrawerNavigate = (tab: Tab | "settings") => {
+    if (tab === "settings") {
+      setActiveTab("settings");
+    } else {
+      handleTabChange(tab as Tab);
+    }
+  };
+
+  const handleAiSubmit = (text: string) => {
+    setActiveTab("ai");
+  };
+
+  // Swipe handlers for Home → Launcher (right swipe)
+  const handleDragEnd = (_: any, info: PanInfo) => {
+    if (activeTab === "home" && (info.offset.x > SWIPE_THRESHOLD || info.velocity.x > 200)) {
+      handleBackToLauncher();
+      return;
+    }
+
+    resetHomeSwipeState();
+  };
+
   const pages: Record<string, React.ReactNode> = {
     launcher: <LauncherPage onEnterGroup={handleEnterGroup} onOpenSettings={handleOpenSettings} />,
-    home: <HomePage onBackToLauncher={handleBackToLauncher} />,
+    home: <HomePage onOpenSettings={handleOpenSettings} />,
     workout: <WorkoutsPage />,
     nutrition: <NutritionPage />,
     habits: <HabitsPage />,
@@ -126,28 +175,53 @@ const Index = () => {
         onRemoveFromNav={handleRemoveFromNav}
         onReplaceInNav={handleReplaceInNav}
         onOpenSettings={handleOpenSettings}
+        navStyle={navStyle}
+        onNavStyleChange={setNavStyle}
       />
     ),
   };
 
   const isInnerPage = activeTab !== "launcher";
-  const showBottomNav = isInnerPage;
+  const showBottomNav = isInnerPage && navStyle === "bottom";
+  const showDrawerButton = isInnerPage && navStyle === "drawer";
 
   return (
     <AppProvider>
       <div className="flex flex-col w-full max-w-md mx-auto bg-background h-svh relative overflow-hidden">
+
+        {/* Main page area */}
         <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab === "chat" ? `chat-${chatGroup?.id || "list"}` : activeTab}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.12 }}
-            className={`flex-1 overflow-y-auto scroll-smooth-touch ${isInnerPage ? "pb-24" : ""}`}
-          >
-            {pages[activeTab]}
-          </motion.div>
+          {activeTab === "launcher" ? (
+            <motion.div
+              key="launcher"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="flex-1 overflow-y-auto scroll-smooth-touch relative"
+            >
+              {pages.launcher}
+            </motion.div>
+          ) : (
+            <motion.div
+              key={activeTab === "chat" ? `chat-${chatGroup?.id || "list"}` : activeTab}
+              initial={{ opacity: 0, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.97 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              drag={activeTab === "home" ? "x" : false}
+              dragConstraints={{ left: 0, right: 300 }}
+              dragElastic={0.15}
+              onDragEnd={handleDragEnd}
+              style={activeTab === "home" ? { x: swipeX } : undefined}
+              className={`flex-1 overflow-y-auto scroll-smooth-touch relative bg-background ${isInnerPage ? (showBottomNav ? "pb-24" : showDrawerButton ? "pb-20" : "pb-4") : ""}`}
+            >
+              {pages[activeTab]}
+            </motion.div>
+          )}
         </AnimatePresence>
+
+        {/* Bottom Navigation */}
         {showBottomNav && (
           <BottomNav
             activeTab={activeTab as Tab}
@@ -159,6 +233,27 @@ const Index = () => {
             }}
           />
         )}
+
+        {/* Drawer Menu Button */}
+        {showDrawerButton && (
+          <DrawerMenuButton onClick={() => setDrawerOpen(true)} />
+        )}
+
+        {/* Floating AI Bar — always visible in drawer mode */}
+        {showDrawerButton && (
+          <FloatingAiBar onSubmit={handleAiSubmit} />
+        )}
+
+        {/* Side Drawer */}
+        <AppDrawer
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          activeTab={activeTab}
+          onNavigate={handleDrawerNavigate}
+          navStyle={navStyle}
+          onNavStyleChange={setNavStyle}
+          onAiSubmit={handleAiSubmit}
+        />
       </div>
     </AppProvider>
   );

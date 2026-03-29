@@ -499,7 +499,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings }: { onBackToLauncher?: () 
   );
 
   const hasSpecificTime = (time?: string) => Boolean(time) && time !== "" && time !== "All day";
-  const isTaskScheduled = (t: Task) => t.scheduledDay !== undefined && t.scheduledMonth !== undefined && t.scheduledYear !== undefined;
+  const isTaskScheduled = (t: Task) => t.scheduledDay != null && t.scheduledMonth != null && t.scheduledYear != null;
   const isTaskTimed = (t: Task) => hasSpecificTime(t.time);
 
   // Helper: parse any time representation to minutes for sorting
@@ -613,14 +613,6 @@ const HomePage = ({ onBackToLauncher, onOpenSettings }: { onBackToLauncher?: () 
       <header className="pt-12 pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {onBackToLauncher && (
-              <button
-                onClick={onBackToLauncher}
-                className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors -ml-1"
-              >
-                <ArrowLeft size={18} />
-              </button>
-            )}
             <div className="flex items-center gap-1">
               <button onClick={() => shiftDate(-1)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-secondary active:scale-95 transition-all">
                 <ChevronLeft size={18} />
@@ -961,7 +953,7 @@ const TaskCard = ({ task, onToggle, onCongrats, readOnly }: { task: Task; onTogg
     onToggle(task.id);
   };
 
-  const hasDate = task.scheduledDay !== undefined && task.scheduledMonth !== undefined && task.scheduledYear !== undefined;
+  const hasDate = task.scheduledDay != null && task.scheduledMonth != null && task.scheduledYear != null;
   const dateLabel = hasDate
     ? new Date(task.scheduledYear!, task.scheduledMonth!, task.scheduledDay!).toLocaleDateString("en-US", { month: "short", day: "numeric" })
     : null;

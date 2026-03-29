@@ -29,6 +29,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import GroupManager from "@/components/GroupManager";
 
+
 const settingsItems = [
   { icon: Bell, label: "Notifications", desc: "Reminders & alerts" },
   { icon: Shield, label: "Privacy", desc: "Data & sharing" },
@@ -422,6 +423,7 @@ const SettingsPage = () => {
           )}
         </div>
       </div>
+
 
       {/* Settings List */}
       <div className="space-y-1">
