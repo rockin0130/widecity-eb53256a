@@ -99,6 +99,19 @@ export interface GoogleCalendarEvent {
   completedBy?: string | null;
   calendarId?: string;
   calendarColor?: string | null;
+  isApple?: boolean;
+}
+
+export interface AppleCalendarEvent {
+  id: string;
+  title: string;
+  startDate: number;
+  endDate: number;
+  allDay: boolean;
+  location?: string | null;
+  calendarId?: string;
+  calendarTitle?: string;
+  calendarColor?: string | null;
 }
 
 interface AppContextType {
@@ -150,6 +163,9 @@ interface AppContextType {
   getHabitsForDate: (date: string) => Habit[];
   getWorkoutsForDate: (date: string) => Workout[];
   googleCalendarEvents: GoogleCalendarEvent[];
+  appleCalendarEvents: AppleCalendarEvent[];
+  setAppleCalendarEvents: (events: AppleCalendarEvent[]) => void;
+  mergeAppleEvents: (events: AppleCalendarEvent[]) => void;
   hideGcalEvent: (eventId: string) => Promise<void>;
   toggleGcalCompletion: (eventId: string) => Promise<void>;
   toggleEventVisibility: (eventId: string) => Promise<void>;
@@ -210,6 +226,39 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [partnerTasks, setPartnerTasks] = useState<Task[]>([]);
   const [partnerWorkouts, setPartnerWorkouts] = useState<Workout[]>([]);
   const [googleCalendarEvents, setGoogleCalendarEvents] = useState<GoogleCalendarEvent[]>([]);
+  const [appleCalendarEvents, setAppleCalendarEvents] = useState<AppleCalendarEvent[]>([]);
+
+  // Merge Apple Calendar events into Google Calendar format when they change
+  useEffect(() => {
+    if (appleCalendarEvents.length === 0) return;
+    const converted = appleCalendarEvents.map((ae) => ({
+  ...ae,
+  isApple: true,
+  source: "apple",
+      id: ae.id,
+      // Add fallback calendar metadata for proper UI grouping
+      calendarTitle: ae.calendarTitle || ae.calendarId || "Apple",
+      calendarId: ae.calendarId || "apple-default",
+      title: ae.title,
+      description: null,
+      start: new Date(ae.startDate).toISOString(),
+      end: new Date(ae.endDate).toISOString(),
+      allDay: ae.allDay,
+      location: ae.location || null,
+      htmlLink: "",
+      calendarColor: ae.calendarColor || "#888888",
+      assignee: "me" as const,
+      done: false,
+      completedAt: null,
+      completedBy: null,
+    }));
+    setGoogleCalendarEvents((prev) => {
+      const withoutApple = prev.filter((e) => !e.id.startsWith("apple-"));
+      const appleConverted = converted.map((e) => ({ ...e, id: "apple-" + e.id }));
+      console.log("Apple events:", appleConverted.slice(0,2).map(e => e.id));
+      return [...withoutApple, ...appleConverted];
+    });
+  }, [appleCalendarEvents]);
   const [habitSectionsState, setHabitSectionsState] = useState<HabitSectionMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshCounter, setRefreshCounter] = useState(0);
@@ -524,6 +573,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const data = await res.json();
         const rawEvents: GoogleCalendarEvent[] = data.events || [];
 
+
         // Load completion states for these gcal events
         const gcalIds = rawEvents.map((ge) => ge.id);
         const { data: completions } = gcalIds.length > 0
@@ -536,6 +586,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           const assignee = (ge.assignee as Assignee | undefined) ?? fallbackAssignee;
           const completion = completionMap.get(ge.id);
           return {
+            ...ge,
+            isApple: false,
+            source: "google",
             ...ge,
             assignee,
             done: completion?.done ?? false,
@@ -1629,6 +1682,33 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       workouts, filteredWorkouts, toggleWorkout, removeWorkout, removeWorkoutsByFilter, updateWorkout, setWorkouts, addWorkouts, rescheduleWorkout, rescheduleWorkoutCascade,
       getHabitStreak, getHabitsForDate, getWorkoutsForDate,
       googleCalendarEvents, hideGcalEvent, toggleGcalCompletion, toggleEventVisibility, designateGcalEvent,
+      appleCalendarEvents, setAppleCalendarEvents,
+      mergeAppleEvents: (events: AppleCalendarEvent[]) => {
+        setAppleCalendarEvents(events);
+        const converted = events.map((ae) => ({
+          isApple: true,
+          id: "apple-" + ae.id,
+          // Add fallback calendar metadata for proper UI grouping
+          calendarTitle: ae.calendarTitle || ae.calendarId || "Apple",
+          calendarId: ae.calendarId || "apple-default",
+          title: ae.title,
+          description: null,
+          start: new Date(ae.startDate).toISOString(),
+          end: new Date(ae.endDate).toISOString(),
+          allDay: ae.allDay,
+          location: ae.location || null,
+          htmlLink: "",
+          calendarColor: ae.calendarColor || "#888888",
+          assignee: "me" as const,
+          done: false,
+          completedAt: null,
+          completedBy: null,
+        }));
+        setGoogleCalendarEvents((prev) => {
+          const withoutApple = prev.filter((e) => !e.id.startsWith("apple-"));
+          return [...withoutApple, ...converted];
+        });
+      },
       partnerHabits, partnerEvents, partnerTasks, partnerWorkouts,
       filteredPartnerHabits, filteredPartnerEvents, filteredPartnerTasks, filteredPartnerWorkouts,
       getPartnerWorkoutsForDate, getPartnerHabitsForDate, getPartnerHabitStreak,

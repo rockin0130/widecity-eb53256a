@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { requestCalendarPermission } from "../integrations/appleCalendar";
+import { requestCalendarPermission, getCalendarEvents } from "../integrations/appleCalendar";
 import {
   User,
   Bell,
@@ -18,6 +18,7 @@ import {
   Users,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useAppContext } from "@/context/AppContext";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -48,6 +49,7 @@ const SettingsPage = () => {
     connectPartner,
     disconnectPartner,
   } = useAuth();
+  const { setAppleCalendarEvents, mergeAppleEvents } = useAppContext();
   const [showPartnerDialog, setShowPartnerDialog] = useState(false);
   const [inviteInput, setInviteInput] = useState("");
   const [connecting, setConnecting] = useState(false);
@@ -131,16 +133,19 @@ const SettingsPage = () => {
       if (result.result === 'granted') {
         setAppleCalConnected(true);
         toast.success("Apple Calendar connected!");
+        // Fetch events for the next year
+        const now = new Date();
+        const nextYear = new Date();
+        nextYear.setFullYear(nextYear.getFullYear() + 1);
+        const events = await getCalendarEvents(now, nextYear);
+          if (events && events.length > 0) {
+            mergeAppleEvents(events);
+          }
         return;
       }
-      if (result.readCalendar === 'granted' || result.writeCalendar === 'granted') {
-        setAppleCalConnected(true);
-        toast.success('Apple Calendar connected!');
-      } else {
-        toast.error('Calendar permission denied');
-      }
+      toast.error('Calendar permission denied');
     } catch (err) {
-      toast.error('Failed to connect Apple Calendar');
+      toast.error('Error: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
     }
     setAppleCalLoading(false);
   };
