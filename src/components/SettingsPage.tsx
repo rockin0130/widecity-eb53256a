@@ -49,7 +49,6 @@ const SettingsPage = () => {
     connectPartner,
     disconnectPartner,
   } = useAuth();
-  const { setAppleCalendarEvents, mergeAppleEvents } = useAppContext();
 
   // Auto-load Apple Calendar events on mount if permission already granted
   useEffect(() => {
@@ -64,7 +63,7 @@ const SettingsPage = () => {
           const events = await getCalendarEvents(now, nextYear);
           if (events && events.length > 0) {
             toast("Merging " + events.length + " events");
-            mergeAppleEvents(events);
+            setAppleCalendarEvents(events);
             setTimeout(() => toast("After 2s: check calendar"), 2000);
           } else {
             toast("No events found: " + JSON.stringify(events?.length));
@@ -163,10 +162,7 @@ const SettingsPage = () => {
         const now = new Date();
         const nextYear = new Date();
         nextYear.setFullYear(nextYear.getFullYear() + 1);
-        const events = await getCalendarEvents(now, nextYear);
-          if (events && events.length > 0) {
-            mergeAppleEvents(events);
-          }
+
         return;
       }
       toast.error('Calendar permission denied');

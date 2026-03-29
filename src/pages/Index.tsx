@@ -1,6 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
-import { requestCalendarPermission, getCalendarEvents } from "../integrations/appleCalendar";
-import { useAppContext } from "@/context/AppContext";
+import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence, useMotionValue, PanInfo } from "framer-motion";
 import MorePage from "@/components/MorePage";
 import BottomNav, { type Tab, loadNavPages, saveNavPages, FIXED_NAV_PAGES, MAX_NAV_SLOTS } from "@/components/BottomNav";
