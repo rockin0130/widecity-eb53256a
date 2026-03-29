@@ -49,6 +49,7 @@ const SettingsPage = () => {
     connectPartner,
     disconnectPartner,
   } = useAuth();
+  const { setAppleCalendarEvents } = useAppContext();
 
   // Auto-load Apple Calendar events on mount if permission already granted
   useEffect(() => {
@@ -62,11 +63,7 @@ const SettingsPage = () => {
           nextYear.setFullYear(nextYear.getFullYear() + 1);
           const events = await getCalendarEvents(now, nextYear);
           if (events && events.length > 0) {
-            toast("Merging " + events.length + " events");
             setAppleCalendarEvents(events);
-            setTimeout(() => toast("After 2s: check calendar"), 2000);
-          } else {
-            toast("No events found: " + JSON.stringify(events?.length));
           }
         }
       } catch (err) {
@@ -74,7 +71,7 @@ const SettingsPage = () => {
       }
     };
     autoLoadAppleCalendar();
-  }, []);
+  }, [setAppleCalendarEvents]);
   const [showPartnerDialog, setShowPartnerDialog] = useState(false);
   const [inviteInput, setInviteInput] = useState("");
   const [connecting, setConnecting] = useState(false);
@@ -153,19 +150,18 @@ const SettingsPage = () => {
   const handleConnectAppleCalendar = async () => {
     setAppleCalLoading(true);
     try {
-      
       const result = await requestCalendarPermission();
       if (result.result === 'granted') {
         setAppleCalConnected(true);
-        toast.success("Apple Calendar connected!");
-        // Fetch events for the next year
         const now = new Date();
         const nextYear = new Date();
         nextYear.setFullYear(nextYear.getFullYear() + 1);
-
-        return;
+        const events = await getCalendarEvents(now, nextYear);
+        setAppleCalendarEvents(events ?? []);
+        toast.success("Apple Calendar connected!");
+      } else {
+        toast.error('Calendar permission denied');
       }
-      toast.error('Calendar permission denied');
     } catch (err) {
       toast.error('Error: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
     }
@@ -174,6 +170,7 @@ const SettingsPage = () => {
 
   const handleDisconnectAppleCalendar = () => {
     setAppleCalConnected(false);
+    setAppleCalendarEvents([]);
     toast.success('Apple Calendar disconnected');
   };
 

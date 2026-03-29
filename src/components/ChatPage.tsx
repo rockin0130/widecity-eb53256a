@@ -1,5 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Send, ArrowLeft, MessageCircle, Mic, Square, Image, Play, Pause, X, Plus, Camera, Film, Images } from "lucide-react";
+import {
+  Send,
+  ArrowLeft,
+  MessageCircle,
+  Mic,
+  Square,
+  Image,
+  Play,
+  Pause,
+  X,
+  Plus,
+  Camera,
+  Film,
+  Images,
+} from "lucide-react";
 import ChatAlbum from "@/components/ChatAlbum";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, Group } from "@/context/AuthContext";
@@ -24,13 +38,7 @@ interface Message {
   metadata?: MessageMetadata | null;
 }
 
-const ChatPage = ({
-  group,
-  onBack,
-}: {
-  group: Group;
-  onBack: () => void;
-}) => {
+const ChatPage = ({ group, onBack }: { group: Group; onBack: () => void }) => {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -53,7 +61,9 @@ const ChatPage = ({
 
   // Audio playback state
   const [playingId, setPlayingId] = useState<string | null>(null);
-  const [playbackProgress, setPlaybackProgress] = useState<Record<string, number>>({});
+  const [playbackProgress, setPlaybackProgress] = useState<
+    Record<string, number>
+  >({});
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -65,11 +75,17 @@ const ChatPage = ({
 
   const memberMap = new Map<string, { name: string; avatar: string | null }>();
   group.members.forEach((m) => {
-    memberMap.set(m.user_id, { name: m.display_name || "Member", avatar: m.avatar_url });
+    memberMap.set(m.user_id, {
+      name: m.display_name || "Member",
+      avatar: m.avatar_url,
+    });
   });
 
   const scrollToBottom = useCallback(() => {
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    setTimeout(
+      () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
+      100
+    );
   }, []);
 
   useEffect(() => {
@@ -96,7 +112,12 @@ const ChatPage = ({
       .channel(`chat-${group.id}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages", filter: `group_id=eq.${group.id}` },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `group_id=eq.${group.id}`,
+        },
         (payload) => {
           const newMsg = payload.new as any;
           if (newMsg.is_ai_coach) return;
@@ -109,7 +130,12 @@ const ChatPage = ({
       )
       .on(
         "postgres_changes",
-        { event: "DELETE", schema: "public", table: "messages", filter: `group_id=eq.${group.id}` },
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "messages",
+          filter: `group_id=eq.${group.id}`,
+        },
         (payload) => {
           const deletedId = (payload.old as any).id;
           setMessages((prev) => prev.filter((m) => m.id !== deletedId));
@@ -202,7 +228,10 @@ const ChatPage = ({
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state !== "inactive"
+    ) {
       mediaRecorderRef.current.stop();
     }
     if (timerRef.current) {
@@ -213,7 +242,10 @@ const ChatPage = ({
   };
 
   const cancelRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state !== "inactive"
+    ) {
       mediaRecorderRef.current.ondataavailable = null;
       mediaRecorderRef.current.onstop = null;
       mediaRecorderRef.current.stop();
@@ -232,16 +264,34 @@ const ChatPage = ({
   };
 
   // ── Media Upload ──
-  const uploadAndSendMedia = async (blob: Blob, type: "voice" | "image" | "video", mimeType: string) => {
+  const uploadAndSendMedia = async (
+    blob: Blob,
+    type: "voice" | "image" | "video",
+    mimeType: string
+  ) => {
     if (!user) return;
     setUploading(true);
 
     try {
-      const ext = mimeType.includes("webm") ? "webm" : mimeType.includes("mp4") ? "mp4" :
-        mimeType.includes("jpeg") || mimeType.includes("jpg") ? "jpg" :
-        mimeType.includes("png") ? "png" : mimeType.includes("gif") ? "gif" :
-        mimeType.includes("webp") ? "webp" : mimeType.includes("quicktime") ? "mov" :
-        mimeType.includes("wav") ? "wav" : mimeType.includes("ogg") ? "ogg" : "bin";
+      const ext = mimeType.includes("webm")
+        ? "webm"
+        : mimeType.includes("mp4")
+        ? "mp4"
+        : mimeType.includes("jpeg") || mimeType.includes("jpg")
+        ? "jpg"
+        : mimeType.includes("png")
+        ? "png"
+        : mimeType.includes("gif")
+        ? "gif"
+        : mimeType.includes("webp")
+        ? "webp"
+        : mimeType.includes("quicktime")
+        ? "mov"
+        : mimeType.includes("wav")
+        ? "wav"
+        : mimeType.includes("ogg")
+        ? "ogg"
+        : "bin";
 
       const fileName = `${user.id}/${Date.now()}_${type}.${ext}`;
 
@@ -251,7 +301,9 @@ const ChatPage = ({
 
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage.from("chat-media").getPublicUrl(fileName);
+      const { data: urlData } = supabase.storage
+        .from("chat-media")
+        .getPublicUrl(fileName);
       const mediaUrl = urlData.publicUrl;
 
       const metadata: MessageMetadata = {
@@ -261,7 +313,12 @@ const ChatPage = ({
         ...(type === "voice" ? { duration: recordingDuration } : {}),
       };
 
-      const contentLabel = type === "voice" ? "🎤 Voice memo" : type === "image" ? "📷 Photo" : "🎥 Video";
+      const contentLabel =
+        type === "voice"
+          ? "🎤 Voice memo"
+          : type === "image"
+          ? "📷 Photo"
+          : "🎥 Video";
 
       const { error } = await supabase.from("messages").insert({
         group_id: group.id,
@@ -280,7 +337,10 @@ const ChatPage = ({
     }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: "image" | "video") => {
+  const handleFileSelect = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: "image" | "video"
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setShowAttachMenu(false);
@@ -317,7 +377,10 @@ const ChatPage = ({
 
     progressTimerRef.current = setInterval(() => {
       if (audio.duration) {
-        setPlaybackProgress((p) => ({ ...p, [msgId]: (audio.currentTime / audio.duration) * 100 }));
+        setPlaybackProgress((p) => ({
+          ...p,
+          [msgId]: (audio.currentTime / audio.duration) * 100,
+        }));
       }
     }, 100);
 
@@ -336,7 +399,10 @@ const ChatPage = ({
 
   const formatTime = (iso: string) => {
     const d = new Date(iso);
-    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    return d.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
   };
 
   const formatDateSeparator = (iso: string) => {
@@ -346,7 +412,11 @@ const ChatPage = ({
     yesterday.setDate(yesterday.getDate() - 1);
     if (d.toDateString() === today.toDateString()) return "Today";
     if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   };
 
   const messagesWithDates: (Message | { type: "date"; label: string })[] = [];
@@ -354,7 +424,10 @@ const ChatPage = ({
   messages.forEach((msg) => {
     const msgDate = new Date(msg.created_at).toDateString();
     if (msgDate !== lastDate) {
-      messagesWithDates.push({ type: "date", label: formatDateSeparator(msg.created_at) });
+      messagesWithDates.push({
+        type: "date",
+        label: formatDateSeparator(msg.created_at),
+      });
       lastDate = msgDate;
     }
     messagesWithDates.push(msg);
@@ -372,19 +445,31 @@ const ChatPage = ({
         <button
           onClick={() => togglePlayback(msg.id, meta.mediaUrl!)}
           className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
-            isMe ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary/10 text-primary"
+            isMe
+              ? "bg-primary-foreground/20 text-primary-foreground"
+              : "bg-primary/10 text-primary"
           }`}
         >
-          {isPlaying ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
+          {isPlaying ? (
+            <Pause size={14} />
+          ) : (
+            <Play size={14} className="ml-0.5" />
+          )}
         </button>
         <div className="flex-1 min-w-0">
           <div className="h-1.5 rounded-full bg-current/20 overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all ${isMe ? "bg-primary-foreground/60" : "bg-primary/60"}`}
+              className={`h-full rounded-full transition-all ${
+                isMe ? "bg-primary-foreground/60" : "bg-primary/60"
+              }`}
               style={{ width: `${progress}%` }}
             />
           </div>
-          <span className={`text-[10px] mt-0.5 block ${isMe ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+          <span
+            className={`text-[10px] mt-0.5 block ${
+              isMe ? "text-primary-foreground/70" : "text-muted-foreground"
+            }`}
+          >
             {meta.duration ? formatDuration(meta.duration) : "0:00"}
           </span>
         </div>
@@ -447,12 +532,7 @@ const ChatPage = ({
   };
 
   if (showAlbum) {
-    return (
-      <ChatAlbum
-        groupId={group.id}
-        onBack={() => setShowAlbum(false)}
-      />
-    );
+    return <ChatAlbum groupId={group.id} onBack={() => setShowAlbum(false)} />;
   }
 
   return (
@@ -469,9 +549,12 @@ const ChatPage = ({
           </button>
           <span className="text-xl">{group.emoji}</span>
           <div className="flex-1 min-w-0">
-            <h1 className="text-base font-bold tracking-tight truncate">{group.name}</h1>
+            <h1 className="text-base font-bold tracking-tight truncate">
+              {group.name}
+            </h1>
             <p className="text-[10px] text-muted-foreground">
-              {group.members.length} member{group.members.length !== 1 ? "s" : ""}
+              {group.members.length} member
+              {group.members.length !== 1 ? "s" : ""}
             </p>
           </div>
           <button
@@ -485,16 +568,25 @@ const ChatPage = ({
       </header>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1" style={{ WebkitOverflowScrolling: "touch" }}>
+      <div
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-1"
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
         {loading && (
           <div className="flex justify-center py-8">
-            <span className="text-sm text-muted-foreground">Loading messages...</span>
+            <span className="text-sm text-muted-foreground">
+              Loading messages...
+            </span>
           </div>
         )}
 
         {!loading && messages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <MessageCircle size={40} strokeWidth={1} className="mb-3 opacity-40" />
+            <MessageCircle
+              size={40}
+              strokeWidth={1}
+              className="mb-3 opacity-40"
+            />
             <p className="text-sm font-medium">No messages yet</p>
             <p className="text-xs mt-1">Start the conversation!</p>
           </div>
@@ -503,7 +595,10 @@ const ChatPage = ({
         {messagesWithDates.map((item, idx) => {
           if ("type" in item && item.type === "date") {
             return (
-              <div key={`date-${idx}`} className="flex items-center justify-center py-3">
+              <div
+                key={`date-${idx}`}
+                className="flex items-center justify-center py-3"
+              >
                 <span className="text-[10px] font-semibold text-muted-foreground bg-secondary px-3 py-1 rounded-full uppercase tracking-wider">
                   {item.label}
                 </span>
@@ -519,15 +614,22 @@ const ChatPage = ({
           const isMedia = meta?.type === "image" || meta?.type === "video";
 
           return (
-            <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"} mb-1`}>
-              <div className={`max-w-[80%] ${isMe ? "items-end" : "items-start"}`}>
+            <div
+              key={msg.id}
+              className={`flex ${isMe ? "justify-end" : "justify-start"} mb-1`}
+            >
+              <div
+                className={`max-w-[80%] ${isMe ? "items-end" : "items-start"}`}
+              >
                 {!isMe && (
                   <span className="text-[10px] font-semibold text-muted-foreground ml-1 mb-0.5 block">
                     {senderName}
                   </span>
                 )}
                 <div
-                  className={`${isMedia ? "p-1" : "px-3.5 py-2"} rounded-2xl text-sm leading-relaxed ${
+                  className={`${
+                    isMedia ? "p-1" : "px-3.5 py-2"
+                  } rounded-2xl text-sm leading-relaxed ${
                     isMe
                       ? "bg-primary text-primary-foreground rounded-br-md"
                       : "bg-secondary text-foreground rounded-bl-md"
@@ -535,7 +637,11 @@ const ChatPage = ({
                 >
                   {renderMessageContent(msg, isMe)}
                 </div>
-                <span className={`text-[9px] text-muted-foreground mt-0.5 block ${isMe ? "text-right mr-1" : "ml-1"}`}>
+                <span
+                  className={`text-[9px] text-muted-foreground mt-0.5 block ${
+                    isMe ? "text-right mr-1" : "ml-1"
+                  }`}
+                >
                   {formatTime(msg.created_at)}
                 </span>
               </div>
@@ -619,7 +725,9 @@ const ChatPage = ({
                 <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600">
                   <Camera size={22} />
                 </div>
-                <span className="text-[10px] font-medium text-muted-foreground">Photo</span>
+                <span className="text-[10px] font-medium text-muted-foreground">
+                  Photo
+                </span>
                 <input
                   type="file"
                   accept="image/*"
@@ -632,7 +740,9 @@ const ChatPage = ({
                 <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600">
                   <Image size={22} />
                 </div>
-                <span className="text-[10px] font-medium text-muted-foreground">Gallery</span>
+                <span className="text-[10px] font-medium text-muted-foreground">
+                  Gallery
+                </span>
                 <input
                   type="file"
                   accept="image/*"
@@ -644,7 +754,9 @@ const ChatPage = ({
                 <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-600">
                   <Film size={22} />
                 </div>
-                <span className="text-[10px] font-medium text-muted-foreground">Video</span>
+                <span className="text-[10px] font-medium text-muted-foreground">
+                  Video
+                </span>
                 <input
                   type="file"
                   accept="video/*"

@@ -402,8 +402,9 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
 
     if (showGoogleCalendar) {
       googleCalendarEvents.forEach((ge) => {
-        // Calendar visibility filter for Google Calendar events
-        if (hasCalendarData && ge.calendarId && !visibleProviderCalendarIds.has(ge.calendarId)) return;
+        // Apple events use native calendar IDs that are not in our DB visibility map — always show when connected.
+        const isAppleSynced = ge.id.startsWith("apple-") || ge.isApple;
+        if (hasCalendarData && ge.calendarId && !isAppleSynced && !visibleProviderCalendarIds.has(ge.calendarId)) return;
 
         const gcalStart = parseGoogleDateValue(ge.start);
         const gcalEnd = parseGoogleDateValue(ge.end) ?? gcalStart;
