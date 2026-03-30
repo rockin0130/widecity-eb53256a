@@ -1,9 +1,25 @@
 import { CapacitorCalendar } from '@ebarooni/capacitor-calendar';
+import type { Calendar } from '@ebarooni/capacitor-calendar';
 import type { AppleCalendarEvent } from '@/context/AppContext';
 
 export async function requestCalendarPermission() {
   const result = await CapacitorCalendar.requestFullCalendarAccess();
   return result;
+}
+
+/** Native calendar list (names + colors) for CalendarsManager. */
+export async function listDeviceCalendars(): Promise<Calendar[]> {
+  const { result } = await CapacitorCalendar.listCalendars();
+  return result ?? [];
+}
+
+/** Normalize plugin color strings for CSS (hex / rgb). */
+export function normalizeAppleCalendarColor(color: string | null | undefined): string {
+  if (!color || !color.trim()) return "hsl(210 100% 50%)";
+  const c = color.trim();
+  if (c.startsWith("#") || c.startsWith("rgb") || c.startsWith("hsl")) return c;
+  if (/^[0-9a-fA-F]{6}$/.test(c)) return `#${c}`;
+  return c;
 }
 
 /** Maps plugin {@link CalendarEvent} fields to our app shape (`isAllDay` → `allDay`). */

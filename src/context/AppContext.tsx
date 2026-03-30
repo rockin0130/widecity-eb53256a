@@ -289,6 +289,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         allDay: ae.allDay,
         location: ae.location || null,
         htmlLink: "",
+        calendarId: ae.calendarId ?? undefined,
         calendarColor: ae.calendarColor || "#888888",
         assignee: "me" as const,
         done: false,

@@ -402,9 +402,16 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
 
     if (showGoogleCalendar) {
       googleCalendarEvents.forEach((ge) => {
-        // Apple events use native calendar IDs that are not in our DB visibility map — always show when connected.
-        const isAppleSynced = ge.id.startsWith("apple-") || ge.isApple;
-        if (hasCalendarData && ge.calendarId && !isAppleSynced && !visibleProviderCalendarIds.has(ge.calendarId)) return;
+        const isAppleEvent = ge.id.startsWith("apple-") || ge.isApple;
+        if (hasCalendarData && ge.calendarId) {
+          const visible = visibleProviderCalendarIds.has(ge.calendarId);
+          if (isAppleEvent) {
+            const hasAppleRow = calendarRecords.some(
+              (c) => c.provider === "apple" && c.provider_calendar_id === ge.calendarId,
+            );
+            if (hasAppleRow && !visible) return;
+          } else if (!visible) return;
+        }
 
         const gcalStart = parseGoogleDateValue(ge.start);
         const gcalEnd = parseGoogleDateValue(ge.end) ?? gcalStart;
@@ -502,7 +509,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
     });
 
     return items;
-  }, [filteredEvents, filteredTasks, googleCalendarEvents, showGoogleCalendar, visibleCalendarIds, visibleProviderCalendarIds, calendarColorMap.defaultVisible, calendarRecords.length]);
+  }, [filteredEvents, filteredTasks, googleCalendarEvents, showGoogleCalendar, visibleCalendarIds, visibleProviderCalendarIds, calendarColorMap.defaultVisible, calendarRecords]);
 
   const selectedDayItems = useMemo(
     () => getItemsForDate(selDay, selMonth, selYear),
@@ -1156,7 +1163,11 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
       </button>
 
       {/* ── Calendars Manager ───────────────────────────── */}
-      <CalendarsManager open={showCalendarsManager} onClose={() => { setShowCalendarsManager(false); loadCalendars(); }} />
+      <CalendarsManager
+        open={showCalendarsManager}
+        onClose={() => { setShowCalendarsManager(false); loadCalendars(); }}
+        onCalendarsUpdated={loadCalendars}
+      />
     </div>
   );
 };

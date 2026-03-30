@@ -5,7 +5,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const encodeState = (payload: { user_id: string; group_id: string }) =>
+type OAuthStatePayload = {
+  user_id: string;
+  group_id: string;
+  /** When "app", callback redirects to native deep link instead of web. */
+  return_to?: "app" | "web";
+};
+
+const encodeState = (payload: OAuthStatePayload) =>
   btoa(JSON.stringify(payload)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
 Deno.serve(async (req) => {
@@ -50,9 +57,11 @@ Deno.serve(async (req) => {
   }
 
   let groupId: string | undefined;
+  let returnTo: "app" | "web" = "web";
   try {
     const body = await req.json();
     groupId = body?.group_id;
+    if (body?.return_to === "app") returnTo = "app";
   } catch {
     // no-op
   }
@@ -80,7 +89,7 @@ Deno.serve(async (req) => {
 
   const redirectUri = `${SUPABASE_URL}/functions/v1/google-calendar-callback`;
   const scope = "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events";
-  const state = encodeState({ user_id: user.id, group_id: groupId });
+  const state = encodeState({ user_id: user.id, group_id: groupId, return_to: returnTo });
 
   const authParams = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,

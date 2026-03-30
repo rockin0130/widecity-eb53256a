@@ -5,7 +5,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const decodeState = (state: string): { user_id: string; group_id: string } | null => {
+type OAuthState = {
+  user_id: string;
+  group_id: string;
+  return_to?: "app" | "web";
+};
+
+const decodeState = (state: string): OAuthState | null => {
   try {
     const normalized = state.replace(/-/g, "+").replace(/_/g, "/");
     const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
@@ -13,6 +19,17 @@ const decodeState = (state: string): { user_id: string; group_id: string } | nul
   } catch {
     return null;
   }
+};
+
+/** Native app deep link after OAuth (must match iOS URL scheme + capacitor.config appId). */
+const buildAppOAuthRedirect = (state: OAuthState): string => {
+  const scheme = Deno.env.get("APP_DEEP_LINK_SCHEME") || "com.widecity.wcplanner";
+  const params = new URLSearchParams({
+    tab: "settings",
+    gcal: "connected",
+    group: state.group_id,
+  });
+  return `${scheme}://oauth/google-calendar?${params.toString()}`;
 };
 
 Deno.serve(async (req) => {
@@ -56,6 +73,7 @@ Deno.serve(async (req) => {
   if (!state?.user_id || !state?.group_id) {
     return new Response("Invalid state", { status: 400, headers: corsHeaders });
   }
+  const returnToApp = state.return_to === "app";
 
   const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID");
   const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET");
@@ -200,12 +218,19 @@ Deno.serve(async (req) => {
       // Non-critical - continue with redirect
     }
 
-    const appUrl = req.headers.get("origin") || "https://widecity.lovable.app";
+    const webAppUrl =
+      Deno.env.get("APP_WEB_URL") ||
+      req.headers.get("origin") ||
+      "https://widecity.lovable.app";
+    const location = returnToApp
+      ? buildAppOAuthRedirect(state)
+      : `${webAppUrl.replace(/\/$/, "")}/?tab=settings&gcal=connected&group=${encodeURIComponent(state.group_id)}`;
+
     return new Response(null, {
       status: 302,
       headers: {
         ...corsHeaders,
-        Location: `${appUrl}/?tab=settings&gcal=connected&group=${state.group_id}`,
+        Location: location,
       },
     });
   } catch (err) {

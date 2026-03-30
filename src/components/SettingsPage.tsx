@@ -28,6 +28,8 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import GroupManager from "@/components/GroupManager";
+import { Capacitor } from "@capacitor/core";
+import { GCAL_OAUTH_EVENT } from "@/lib/oauthDeepLink";
 
 const settingsItems = [
   { icon: Bell, label: "Notifications", desc: "Reminders & alerts" },
@@ -104,15 +106,33 @@ const SettingsPage = () => {
         .maybeSingle();
       setGcalConnected(!!data);
     };
-    checkGcal();
+    void checkGcal();
 
-    // Check URL for gcal=connected redirect
+    // Web / PWA: OAuth returns to https origin with ?gcal=connected (see google-calendar-callback)
     const params = new URLSearchParams(window.location.search);
     if (params.get("gcal") === "connected") {
       setGcalConnected(true);
       toast.success("Google Calendar connected! 🎉");
       window.history.replaceState({}, "", window.location.pathname);
     }
+  }, [user, activeGroup]);
+
+  // Native: custom-scheme return fires GCAL_OAUTH_EVENT from App.tsx — refresh token state
+  useEffect(() => {
+    const onNativeReturn = () => {
+      void (async () => {
+        if (!user || !activeGroup) return;
+        const { data } = await supabase
+          .from("google_calendar_tokens")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("group_id", activeGroup.id)
+          .maybeSingle();
+        setGcalConnected(!!data);
+      })();
+    };
+    window.addEventListener(GCAL_OAUTH_EVENT, onNativeReturn);
+    return () => window.removeEventListener(GCAL_OAUTH_EVENT, onNativeReturn);
   }, [user, activeGroup]);
 
   const handleCopyCode = () => {
@@ -181,7 +201,10 @@ const SettingsPage = () => {
       const { data, error } = await supabase.functions.invoke(
         "google-calendar-auth-url",
         {
-          body: { group_id: activeGroup.id },
+          body: {
+            group_id: activeGroup.id,
+            ...(Capacitor.isNativePlatform() ? { return_to: "app" as const } : {}),
+          },
         },
       );
       if (error || !data?.url) throw error || new Error("No URL returned");

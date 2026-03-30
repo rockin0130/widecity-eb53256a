@@ -23,6 +23,8 @@ import { AppProvider } from "@/context/AppContext";
 import { useAuth, Group } from "@/context/AuthContext";
 import { useNavStyle } from "@/hooks/useNavStyle";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { GCAL_OAUTH_EVENT } from "@/lib/oauthDeepLink";
 
 type FullTab = "launcher" | Tab;
 
@@ -50,6 +52,23 @@ const Index = () => {
       resetHomeSwipeState();
     }
   }, [activeTab, resetHomeSwipeState]);
+
+  // Native Google OAuth return: deep link → App.tsx dispatches event → open Settings + toast
+  useEffect(() => {
+    if (!user) return;
+    const onGcalOauth = (e: Event) => {
+      const ce = e as CustomEvent<{ groupId?: string }>;
+      const gid = ce.detail?.groupId;
+      if (gid) {
+        const g = groups.find((x) => x.id === gid);
+        if (g) setActiveGroup(g);
+      }
+      setActiveTab("settings");
+      toast.success("Google Calendar connected! 🎉");
+    };
+    window.addEventListener(GCAL_OAUTH_EVENT, onGcalOauth as EventListener);
+    return () => window.removeEventListener(GCAL_OAUTH_EVENT, onGcalOauth as EventListener);
+  }, [user, groups, setActiveGroup, setActiveTab]);
 
   if (loading) {
     return (

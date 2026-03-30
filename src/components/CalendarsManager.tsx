@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, Plus, Check, ChevronDown, ChevronUp, Info, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
@@ -32,7 +33,7 @@ interface ProviderGroup {
 const PROVIDER_META: Record<string, { label: string; icon: string }> = {
   local: { label: "My Calendars", icon: "📅" },
   google: { label: "Google", icon: "🔵" },
-  apple: { label: "iCloud", icon: "☁️" },
+  apple: { label: "Apple", icon: "🍎" },
   outlook: { label: "Outlook", icon: "📧" },
 };
 
@@ -54,9 +55,11 @@ const CALENDAR_COLORS = [
 interface Props {
   open: boolean;
   onClose: () => void;
+  /** Refresh Calendar tab visibility maps after toggles (parent loads `calendars` rows). */
+  onCalendarsUpdated?: () => void;
 }
 
-const CalendarsManager = ({ open, onClose }: Props) => {
+const CalendarsManager = ({ open, onClose, onCalendarsUpdated }: Props) => {
   const { user, groups } = useAuth();
   const [calendars, setCalendars] = useState<CalendarEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,58 +104,105 @@ const CalendarsManager = ({ open, onClose }: Props) => {
     setLoading(false);
   }, [user]);
 
-  // Sync Google calendars from connected accounts
+  /** Upsert native Apple calendars (names + colors) into `calendars` for visibility toggles. */
+  const syncAppleCalendars = useCallback(async () => {
+    if (!user || !Capacitor.isNativePlatform()) return;
+    try {
+      const { requestCalendarPermission, listDeviceCalendars, normalizeAppleCalendarColor } =
+        await import("@/integrations/appleCalendar");
+      const perm = await requestCalendarPermission();
+      if (perm.result !== "granted") return;
+
+      const native = await listDeviceCalendars();
+      if (native.length === 0) return;
+
+      const { data: existing } = await supabase
+        .from("calendars")
+        .select("id, provider_calendar_id, is_visible, sort_order")
+        .eq("user_id", user.id)
+        .eq("provider", "apple");
+
+      const existingByNativeId = new Map(
+        (existing ?? []).map((r) => [r.provider_calendar_id as string, r]),
+      );
+
+      for (let i = 0; i < native.length; i++) {
+        const cal = native[i];
+        const nativeId = cal.id;
+        const row = existingByNativeId.get(nativeId);
+        const color = normalizeAppleCalendarColor(cal.color);
+        if (row) {
+          await supabase
+            .from("calendars")
+            .update({
+              name: cal.title,
+              color,
+              updated_at: new Date().toISOString(),
+            } as any)
+            .eq("id", row.id);
+        } else {
+          await supabase.from("calendars").insert({
+            user_id: user.id,
+            name: cal.title,
+            color,
+            provider: "apple",
+            provider_calendar_id: nativeId,
+            is_visible: true,
+            is_default: false,
+            sort_order: 2000 + i,
+          } as any);
+        }
+      }
+    } catch (err) {
+      console.warn("syncAppleCalendars:", err);
+    }
+  }, [user]);
+
+  // Sync Google calendars from connected accounts, then Apple native calendars (iOS/Android).
   const syncGoogleCalendars = useCallback(async () => {
     if (!user || !groups || groups.length === 0) return;
     setSyncing(true);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        setSyncing(false);
-        return;
-      }
+      if (session?.access_token) {
+        const { data: tokens } = await supabase
+          .from("google_calendar_tokens")
+          .select("group_id")
+          .eq("user_id", user.id);
 
-      // Check which groups have Google Calendar connected
-      const { data: tokens } = await supabase
-        .from("google_calendar_tokens")
-        .select("group_id")
-        .eq("user_id", user.id);
-
-      if (!tokens || tokens.length === 0) {
-        setSyncing(false);
-        return;
-      }
-
-      // Fetch calendars for each connected group
-      for (const tokenRow of tokens) {
-        if (!tokenRow.group_id) continue;
-        try {
-          const res = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-list?groupId=${encodeURIComponent(tokenRow.group_id)}`,
-            {
-              headers: {
-                Authorization: `Bearer ${session.access_token}`,
-                apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-              },
+        if (tokens && tokens.length > 0) {
+          for (const tokenRow of tokens) {
+            if (!tokenRow.group_id) continue;
+            try {
+              const res = await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-list?groupId=${encodeURIComponent(tokenRow.group_id)}`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${session.access_token}`,
+                    apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+                  },
+                }
+              );
+              if (!res.ok) {
+                console.warn("Failed to fetch Google calendars for group", tokenRow.group_id);
+              }
+            } catch (err) {
+              console.error("Error syncing Google calendars:", err);
             }
-          );
-          if (!res.ok) {
-            console.warn("Failed to fetch Google calendars for group", tokenRow.group_id);
           }
-        } catch (err) {
-          console.error("Error syncing Google calendars:", err);
         }
       }
 
-      // Refresh the calendar list
+      await syncAppleCalendars();
       await fetchCalendars();
+      onCalendarsUpdated?.();
     } catch (err) {
       console.error("Error in syncGoogleCalendars:", err);
     }
 
     setSyncing(false);
-  }, [user, groups, fetchCalendars]);
+  }, [user, groups, fetchCalendars, syncAppleCalendars, onCalendarsUpdated]);
 
   useEffect(() => {
     if (open) {
@@ -191,6 +241,7 @@ const CalendarsManager = ({ open, onClose }: Props) => {
       .from("calendars")
       .update({ is_visible: visible } as any)
       .eq("id", id);
+    onCalendarsUpdated?.();
   };
 
   const handleCreateCalendar = async () => {
@@ -248,6 +299,10 @@ const CalendarsManager = ({ open, onClose }: Props) => {
     const cal = calendars.find((c) => c.id === id);
     if (cal?.isDefault) {
       toast.error("Cannot delete default calendar");
+      return;
+    }
+    if (cal?.provider === "apple") {
+      toast.error("Hide this calendar with the toggle, or remove it in Apple Calendar");
       return;
     }
     await supabase.from("calendars").delete().eq("id", id);
@@ -421,7 +476,13 @@ const CalendarsManager = ({ open, onClose }: Props) => {
 
                                 {/* Info / edit button */}
                                 <button
-                                  onClick={() => startEdit(cal)}
+                                  onClick={() => {
+                                    if (cal.provider === "apple") {
+                                      toast.message("Name and color are managed in Apple Calendar");
+                                      return;
+                                    }
+                                    startEdit(cal);
+                                  }}
                                   className="w-7 h-7 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
                                 >
                                   <Info size={16} />
